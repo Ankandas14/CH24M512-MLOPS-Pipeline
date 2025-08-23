@@ -2,7 +2,7 @@ from cnnClassifier.constants import *
 import os
 from cnnClassifier import logger
 from cnnClassifier.utils.common import read_yaml, create_directories,save_json
-from cnnClassifier.entity.config_entity import (DataIngestionConfig, PrepareBaseModelConfig)
+from cnnClassifier.entity.config_entity import (DataIngestionConfig, PrepareBaseModelConfig, DataPreprocessingConfig)
 
 class ConfigurationManager:
     def __init__(
@@ -46,3 +46,16 @@ class ConfigurationManager:
         )
 
         return prepare_base_model_config
+    
+    def get_data_preprocessing_config(self) -> DataPreprocessingConfig:
+        config = self.config.data_preprocessing
+
+        create_directories([config.processed_root])
+
+        data_preprocessing_config = DataPreprocessingConfig(
+            mnist=config.mnist,
+            processed_root=config.processed_root,
+            resize=config.resize
+        )
+
+        return data_preprocessing_config

@@ -20,4 +20,5 @@ gdown
 torchvision
 tensorflow
 keras
+idx2numpy
 -e .

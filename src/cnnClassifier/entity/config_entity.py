@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+# For Spark-based distributed preprocessing
+@dataclass(frozen=True)
+class DataPreprocessingConfig:
+    mnist: dict
+    processed_root: str
+    resize: list
+
 
 @dataclass(frozen=True)
 class DataIngestionConfig:
