@@ -17,4 +17,7 @@ scipy
 Flask
 Flask-Cors
 gdown
+torchvision
+tensorflow
+keras
 -e .
