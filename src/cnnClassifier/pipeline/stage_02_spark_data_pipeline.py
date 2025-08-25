@@ -1,6 +1,5 @@
 from cnnClassifier.components.data_preprocessing import TitanicPreprocessing
 from cnnClassifier.config.configuration import ConfigurationManager
-from cnnClassifier.components.data_preprocessing import DataPreprocessing
 from cnnClassifier import logger
 
 STAGE_NAME = "Spark Data Preprocessing stage"

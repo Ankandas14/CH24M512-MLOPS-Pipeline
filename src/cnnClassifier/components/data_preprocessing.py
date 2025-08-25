@@ -1,108 +1,139 @@
-
 import os, sys
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit
+from pyspark.sql.functions import col, when, isnan, count, mean, udf
+from pyspark.sql.types import IntegerType, DoubleType, StringType
 from cnnClassifier import logger
-from cnnClassifier.entity.config_entity import DataPreprocessingConfig
+from cnnClassifier.entity.config_entity import TitanicPreprocessingConfig
 from pathlib import Path
-import idx2numpy
-import numpy as np
-from PIL import Image
-import io
-import uuid
 os.environ["PYSPARK_PYTHON"] = sys.executable
 os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
 
-class DataPreprocessing:
-    def __init__(self, config: DataPreprocessingConfig):
+class TitanicPreprocessing:
+    def assemble_features(self, df):
+        """
+        Assembles all columns except 'Survived' and 'features' into a single feature vector column called 'features'.
+        Retains the 'Survived' column in the output DataFrame.
+        """
+        from pyspark.ml.feature import VectorAssembler
+        input_cols = [col for col in df.columns if col not in ["Survived", "features"]]
+        assembler = VectorAssembler(inputCols=input_cols, outputCol="features")
+        df = assembler.transform(df)
+        # Ensure 'Survived' is present
+        if "Survived" in df.columns:
+            df = df.select(["Survived"] + [c for c in df.columns if c != "Survived"])
+        return df
+    def vector_assemble_features(self, df, input_cols, output_col="features"):
+        """
+        Transforms the DataFrame by assembling the specified input columns into a single vector column using PySpark's VectorAssembler.
+        Args:
+            df: Input Spark DataFrame
+            input_cols: List of column names to assemble
+            output_col: Name of the output vector column (default: 'features')
+        Returns:
+            DataFrame with the new vector column
+        """
+        from pyspark.ml.feature import VectorAssembler
+        assembler = VectorAssembler(inputCols=input_cols, outputCol=output_col)
+        df = assembler.transform(df)
+        return df
+    def __init__(self, config: TitanicPreprocessingConfig):
         self.config = config
         self.spark = None
-        self.resize_w, self.resize_h = config.resize
         self.processed_root = Path(config.processed_root)
 
-    def build_spark(self, app_name="MNIST-Spark-ETL"):
+    def build_spark(self, app_name="Titanic-Spark-ETL"):
         self.spark = (
             SparkSession.builder
             .appName(app_name)
-            .config("spark.driver.bindAddress", "127.0.0.1") \
-            .config("spark.driver.host", "127.0.0.1") \
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.driver.host", "127.0.0.1")
+            .config("spark.hadoop.io.native.lib.available", "false")
+            .config("spark.sql.parquet.output.committer.class", "org.apache.parquet.hadoop.ParquetOutputCommitter")
+            .config("spark.driver.memory", "6g")
+            .config("spark.executor.memory", "6g")
             .getOrCreate()
-        )
+)
         logger.info(f"Spark session started with app name: {app_name}")
 
-    def _load_idx(self, img_path: str, lbl_path: str):
-        X = idx2numpy.convert_from_file(img_path)
-        y = idx2numpy.convert_from_file(lbl_path)
-        X = X.reshape((X.shape[0], -1))
-        rows = [(int(y[i]), X[i].astype(int).tolist()) for i in range(X.shape[0])]
-        from pyspark.sql.types import StructType, StructField, IntegerType, ArrayType
-        schema = StructType([
-            StructField("label", IntegerType(), False),
-            StructField("pixels", ArrayType(IntegerType(), False), False)
-        ])
-        return self.spark.createDataFrame(rows, schema)
+    def load_data(self, csv_path):
+        return self.spark.read.csv(csv_path, header=True, inferSchema=True)
 
+    def preprocess(self, df):
+        # Fill missing Age with mean
+        mean_age = df.select(mean(col("Age"))).collect()[0][0]
+        df = df.withColumn("Age", when(col("Age").isNull(), mean_age).otherwise(col("Age")))
+        # Fill missing Embarked with most common
+        most_common_embarked = df.groupBy("Embarked").count().orderBy(col("count").desc()).first()[0]
+        df = df.withColumn("Embarked", when(col("Embarked").isNull(), most_common_embarked).otherwise(col("Embarked")))
+        # Fill missing Fare with mean
+        mean_fare = df.select(mean(col("Fare"))).collect()[0][0]
+        df = df.withColumn("Fare", when(col("Fare").isNull(), mean_fare).otherwise(col("Fare")))
+        # Convert categorical columns to numerical using StringIndexer and Pipeline
+        from pyspark.ml.feature import StringIndexer
+        from pyspark.ml import Pipeline
+        indexers = [StringIndexer(inputCol=column, outputCol=column+"_index").fit(df) for column in ["Sex","Embarked"]]
+        pipeline = Pipeline(stages=indexers)
+        df = pipeline.fit(df).transform(df)
+        # Scale Age and Fare using a separate method
+        df = self.scale_numerical_features(df)
+        # Drop columns not needed
+        df = df.drop("Name", "Ticket", "Cabin", "PassengerId", "Sex", "Embarked")
+        # Assemble all features except the first column
+        df = self.assemble_features(df)
+        return df
+    def scale_numerical_features(self, df):
+        """
+        Scales the 'Age' and 'Fare' columns using PySpark's StandardScaler and adds new columns 'Age_scaled' and 'Fare_scaled'.
+        """
+        from pyspark.ml.feature import VectorAssembler, StandardScaler
+        from pyspark.sql.functions import udf as spark_udf
+        from pyspark.sql.types import DoubleType
+        # Assemble features
+        assembler = VectorAssembler(inputCols=["Age", "Fare"], outputCol="features_to_scale")
+        df = assembler.transform(df)
+        # StandardScaler
+        scaler = StandardScaler(inputCol="features_to_scale", outputCol="scaled_features", withMean=True, withStd=True)
+        scaler_model = scaler.fit(df)
+        df = scaler_model.transform(df)
+        # Extract scaled Age and Fare
+        def extract_age(features):
+            return float(features[0]) if features else None
+        def extract_fare(features):
+            return float(features[1]) if features else None
+        extract_age_udf = spark_udf(extract_age, DoubleType())
+        extract_fare_udf = spark_udf(extract_fare, DoubleType())
+        df = df.withColumn("Age_scaled", extract_age_udf(col("scaled_features")))
+        df = df.withColumn("Fare_scaled", extract_fare_udf(col("scaled_features")))
+        df = df.drop("features_to_scale", "scaled_features")
+        return df
 
-    def load_train(self):
-        d = self.config.mnist
-        return self._load_idx(d["train_images"], d["train_labels"]).withColumn("split", lit("train"))
+    def write_data(self, df, out_path):
+        df.write.mode("overwrite").parquet(out_path)
+        logger.info(f"Preprocessed Titanic data written to {out_path}")
+    def view_parquet(self, parquet_path):
+        df = self.spark.read.parquet(parquet_path)
+        shape = (df.count(), len(df.columns))
+        logger.info(f"Shape of {parquet_path}: {shape}")
+        logger.info(f"First 5 rows of {parquet_path}:")
+        df.show(5)
+        logger.info(f"Summary of {parquet_path}:")
+        df.describe().show()
 
-    def load_test(self):
-        d = self.config.mnist
-        return self._load_idx(d["test_images"], d["test_labels"]).withColumn("split", lit("test"))
-
-    @staticmethod
-    def _to_png_bytes(pixels, label, resize_w, resize_h):
-        arr = np.array(pixels, dtype=np.uint8).reshape(28, 28)
-        p_min, p_max = int(arr.min()), int(arr.max())
-        if p_max > p_min:
-            arr = ((arr - p_min) * (255.0 / (p_max - p_min))).astype(np.uint8)
-        img = Image.fromarray(arr, mode="L").resize((resize_w, resize_h), resample=Image.BILINEAR).convert("RGB")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG", optimize=True)
-        # Return as list of ints for Spark compatibility
-        return list(buf.getvalue())
-
-    def transform_and_write(self, df):
-        resize_w, resize_h = self.resize_w, self.resize_h
-        from pyspark.sql.functions import udf, col, monotonically_increasing_id
-        from pyspark.sql.types import ArrayType, IntegerType
-        to_png_udf = udf(
-            lambda p, y: DataPreprocessing._to_png_bytes(p, y, resize_w, resize_h),
-            returnType=ArrayType(IntegerType(), False)
-        )
-        df_bytes = df.withColumn("png_bytes", to_png_udf(col("pixels"), col("label"))) \
-                     .withColumn("id", monotonically_increasing_id())
-        out_root = str(self.processed_root.resolve())
-        def _write_partition(rows):
-            for r in rows:
-                split = r["split"]
-                label = r["label"]
-                try:
-                    raw_bytes = r["png_bytes"]
-                    invalid = [x for x in raw_bytes if not (0 <= int(x) <= 255)]
-                    if invalid:
-                        logger.error(f"Out-of-range bytes for label {label}, split {split}: {invalid}")
-                        continue
-                    bts = bytes([int(x) for x in raw_bytes])
-                    fname = f"{uuid.uuid4().hex}.png"
-                    out_dir = Path(out_root) / split / str(label)
-                    out_dir.mkdir(parents=True, exist_ok=True)
-                    with open(out_dir / fname, "wb") as f:
-                        f.write(bts)
-                except Exception as e:
-                    logger.error(f"Exception in writing PNG for label {label}, split {split}: {e}")
-                    continue
-        df_bytes.select("split", "label", "png_bytes").foreachPartition(_write_partition)
-        logger.info(f"Preprocessed images written to {out_root}")
-        return str(self.processed_root)
-
-    def run(self):
+    def run(self,):
         self.build_spark()
-        train_df = self.load_train()
-        test_df = self.load_test()
-        full_df = train_df.unionByName(test_df)
-        out_dir = self.transform_and_write(full_df)
+        train_path = self.config.train_csv
+        # Load full train.csv
+        full_df = self.load_data(train_path)
+        # Split into train/test (80/20)
+        train_df, test_df = full_df.randomSplit([0.8, 0.2], seed=42)
+        train_df = self.preprocess(train_df)
+        test_df = self.preprocess(test_df)
+        train_out = str(self.processed_root / "train.parquet")
+        test_out = str(self.processed_root / "test.parquet")
+        self.write_data(train_df, train_out)
+        self.write_data(test_df, test_out)
+        self.view_parquet(train_out)
+        self.view_parquet(test_out)
         self.spark.stop()
-        logger.info(f"Spark session stopped. Output dir: {out_dir}")
-        return out_dir
+        logger.info(f"Spark session stopped. Output dir: {self.processed_root}")
+        return str(self.processed_root)

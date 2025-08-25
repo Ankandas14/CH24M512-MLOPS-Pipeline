@@ -1,8 +1,11 @@
+from src.cnnClassifier.config.model_training_config import ModelTrainingConfig
+from pathlib import Path
+import yaml
 from cnnClassifier.constants import *
 import os
 from cnnClassifier import logger
 from cnnClassifier.utils.common import read_yaml, create_directories,save_json
-from cnnClassifier.entity.config_entity import (DataIngestionConfig, PrepareBaseModelConfig, DataPreprocessingConfig)
+from cnnClassifier.entity.config_entity import (DataIngestionConfig, PrepareBaseModelConfig, DataPreprocessingConfig, TitanicPreprocessingConfig)
 
 class ConfigurationManager:
     def __init__(
@@ -29,33 +32,41 @@ class ConfigurationManager:
 
         return data_ingestion_config
     
-    def get_prepare_base_model_config(self) -> PrepareBaseModelConfig:
-        config = self.config.prepare_base_model
-        
-        create_directories([config.root_dir])
-
-        prepare_base_model_config = PrepareBaseModelConfig(
-            root_dir=Path(config.root_dir),
-            base_model_path=Path(config.base_model_path),
-            updated_base_model_path=Path(config.updated_base_model_path),
-            params_image_size=self.params.IMAGE_SIZE,
-            params_learning_rate=self.params.LEARNING_RATE,
-            params_include_top=self.params.INCLUDE_TOP,
-            params_weights=self.params.WEIGHTS,
-            params_classes=self.params.CLASSES
-        )
-
-        return prepare_base_model_config
+   
     
-    def get_data_preprocessing_config(self) -> DataPreprocessingConfig:
-        config = self.config.data_preprocessing
-
-        create_directories([config.processed_root])
-
-        data_preprocessing_config = DataPreprocessingConfig(
-            mnist=config.mnist,
-            processed_root=config.processed_root,
-            resize=config.resize
-        )
+   
 
         return data_preprocessing_config
+    
+    def get_titanic_preprocessing_config(self) -> TitanicPreprocessingConfig:
+        config = self.config.data_preprocessing.titanic
+        return TitanicPreprocessingConfig(
+            train_csv=config["train_csv"],
+            test_csv=config["test_csv"],
+            processed_root=config["processed_root"]
+        )
+    
+    def get_model_training_config(self) -> ModelTrainingConfig:
+        # Support both YAML and entity-based config
+        if hasattr(self, 'config') and hasattr(self.config, 'model_training'):
+            config = self.config.model_training
+            train_data_path = config.train_data_path
+            test_data_path = config.test_data_path
+            reg_params = getattr(config, 'reg_params', [0.01, 0.1, 1.0])
+            elastic_net_params = getattr(config, 'elastic_net_params', [0.0, 0.5, 1.0])
+            num_folds = getattr(config, 'num_folds', 3)
+        else:
+            # fallback to dict-style config
+            config = self.config['model_training']
+            train_data_path = config['train_data_path']
+            test_data_path = config['test_data_path']
+            reg_params = config.get('reg_params', [0.01, 0.1, 1.0])
+            elastic_net_params = config.get('elastic_net_params', [0.0, 0.5, 1.0])
+            num_folds = config.get('num_folds', 3)
+        return ModelTrainingConfig(
+            train_data_path=train_data_path,
+            test_data_path=test_data_path,
+            reg_params=reg_params,
+            elastic_net_params=elastic_net_params,
+            num_folds=num_folds
+        )

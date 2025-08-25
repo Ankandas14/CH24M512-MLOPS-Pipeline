@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Ankan/M.Tech/2024/Term3/Industrial_AI_Scale/MLOPS_Project/CH24M512-MLOPS-Pipeline/mlruns/752272905976557802/60c6318ea5244e01a8346e950bd891e9/artifacts
+end_time: 1756157168305
+entry_point_name: ''
+experiment_id: '752272905976557802'
+lifecycle_stage: active
+run_id: 60c6318ea5244e01a8346e950bd891e9
+run_name: LogisticRegression
+run_uuid: 60c6318ea5244e01a8346e950bd891e9
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1756157136428
+status: 4
+tags: []
+user_id: Shalini

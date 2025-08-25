@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 # For Spark-based distributed preprocessing
@@ -52,3 +53,20 @@ class EvaluationConfig:
     mlflow_uri: str
     params_image_size: list
     params_batch_size: int
+
+
+@dataclass(frozen=True)
+class TitanicPreprocessingConfig:
+    train_csv: str
+    test_csv: str
+    processed_root: str
+
+@dataclass(frozen=True)
+class ModelTrainingConfig:
+    train_data_path: str
+    test_data_path: str
+    label_col: str = "Survived"
+    features_col: str = "features"
+    reg_params: list = None
+    elastic_net_params: list = None
+    num_folds: int = 3

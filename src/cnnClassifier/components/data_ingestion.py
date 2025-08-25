@@ -12,24 +12,23 @@ class DataIngestion:
         self.config = config
 
     
-    def download_file(self)-> str:
+    def download_file(self) -> str:
         '''
-        Fetch data from the url
+        Fetch data from the url using config.yaml data_ingestion section
         '''
-
-        try: 
+        try:
             dataset_url = self.config.source_URL
             zip_download_dir = self.config.local_data_file
-            os.makedirs("artifacts/data_ingestion", exist_ok=True)
+            os.makedirs(os.path.dirname(zip_download_dir), exist_ok=True)
             logger.info(f"Downloading data from {dataset_url} into file {zip_download_dir}")
 
             file_id = dataset_url.split("/")[-2]
             prefix = 'https://drive.google.com/uc?/export=download&id='
-            gdown.download(prefix+file_id,zip_download_dir)
+            gdown.download(prefix + file_id, str(zip_download_dir))
 
             logger.info(f"Downloaded data from {dataset_url} into file {zip_download_dir}")
-
         except Exception as e:
+            logger.error(f"Error downloading file: {e}")
             raise e
         
     
