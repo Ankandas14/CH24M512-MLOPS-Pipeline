@@ -1,45 +1,29 @@
 stages:
-	stage_01_data_ingestion:
-		cmd: python src/cnnClassifier/pipeline/stage_01_data_ingestion.py
-		deps:
-			- src/cnnClassifier/pipeline/stage_01_data_ingestion.py
-			- config/config.yaml
-		outs:
-			- artifacts/data_ingestion/unzipped_data
-		params:
-			- data_ingestion.root_dir
-			- data_ingestion.source_URL
-			- data_ingestion.local_data_file
-			- data_ingestion.unzip_dir
+  stage_01_data_ingestion:
+    cmd: python src/cnnClassifier/pipeline/stage_01_data_ingestion.py
+    deps:
+      - src/cnnClassifier/pipeline/stage_01_data_ingestion.py
+      - config/config.yaml
+    outs:
+      - artifacts/data_ingestion/unzipped_data
+    
 
-	stage_02_spark_data_pipeline:
-		cmd: python src/cnnClassifier/pipeline/stage_02_spark_data_pipeline.py
-		deps:
-			- src/cnnClassifier/pipeline/stage_02_spark_data_pipeline.py
-			- config/config.yaml
-		outs:
-			- artifacts/data_preprocessing/processed_titanic/train.parquet
-			- artifacts/data_preprocessing/processed_titanic/test.parquet
-		params:
-			- data_preprocessing.titanic.train_csv
-			- data_preprocessing.titanic.test_csv
-			- data_preprocessing.titanic.processed_root
+  stage_02_spark_data_pipeline:
+    cmd: python src/cnnClassifier/pipeline/stage_02_spark_data_pipeline.py
+    deps:
+      - src/cnnClassifier/pipeline/stage_02_spark_data_pipeline.py
+      - config/config.yaml
+    outs:
+      - artifacts/data_preprocessing/processed_titanic/train.parquet
+      - artifacts/data_preprocessing/processed_titanic/test.parquet
+   
 
-	stage_03_model_training:
-		cmd: python src/cnnClassifier/pipeline/stage_03_model_training.py
-		deps:
-			- src/cnnClassifier/pipeline/stage_03_model_training.py
-			- config/config.yaml
-		outs:
-			- artifacts/data_preprocessing/processed_titanic/train.parquet
-			- artifacts/data_preprocessing/processed_titanic/test.parquet
-			- confusion_matrix.png
-			- mlruns
-		params:
-			- model_training.train_data_path
-			- model_training.test_data_path
-			- model_training.label_col
-			- model_training.features_col
-			- model_training.reg_params
-			- model_training.elastic_net_params
-			- model_training.num_folds
+  stage_03_model_training:
+    cmd: python src/cnnClassifier/pipeline/stage_03_model_training.py
+    deps:
+      - src/cnnClassifier/pipeline/stage_03_model_training.py
+      - config/config.yaml
+    outs:
+      - confusion_matrix.png
+      - mlruns
+    

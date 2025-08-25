@@ -1,4 +1,4 @@
-from src.cnnClassifier.config.model_training_config import ModelTrainingConfig
+from cnnClassifier.config.model_training_config import ModelTrainingConfig
 from pathlib import Path
 import yaml
 from cnnClassifier.constants import *
