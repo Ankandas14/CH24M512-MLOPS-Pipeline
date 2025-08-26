@@ -3,11 +3,13 @@ from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.sql import DataFrame
 
+from cnnClassifier.entity.config_entity import ModelTrainingConfig
+
 
 
 STAGE_NAME = "Training"
 class ModelTrainer:
-    def __init__(self, config):
+    def __init__(self,config:ModelTrainingConfig):
         self.config = config
 
     def train(self, train_df: DataFrame):

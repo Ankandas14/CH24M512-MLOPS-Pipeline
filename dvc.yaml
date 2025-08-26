@@ -25,5 +25,6 @@ stages:
       - config/config.yaml
     outs:
       - confusion_matrix.png
-      - mlruns
+      - artifacts/best_model/
+      
     

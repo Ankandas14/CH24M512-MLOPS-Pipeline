@@ -17,3 +17,25 @@ stages:
       md5: 2e92afb04cc1088e96c965b66ea57b1b.dir
       size: 93081
       nfiles: 3
+  stage_02_spark_data_pipeline:
+    cmd: python src/cnnClassifier/pipeline/stage_02_spark_data_pipeline.py
+    deps:
+    - path: config/config.yaml
+      hash: md5
+      md5: 6000c0dc8afad7c629b1aa94deb33247
+      size: 839
+    - path: src/cnnClassifier/pipeline/stage_02_spark_data_pipeline.py
+      hash: md5
+      md5: 251f7542651d928e106492ab71b6604b
+      size: 988
+    outs:
+    - path: artifacts/data_preprocessing/processed_titanic/test.parquet
+      hash: md5
+      md5: cf4d93426ed2e803d0f3c7b5415dac43.dir
+      size: 11201
+      nfiles: 4
+    - path: artifacts/data_preprocessing/processed_titanic/train.parquet
+      hash: md5
+      md5: 0570a19b53963345b8f4ec85cde6c90e.dir
+      size: 25763
+      nfiles: 4

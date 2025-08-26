@@ -4,6 +4,9 @@ from cnnClassifier.config.configuration import ConfigurationManager
 from cnnClassifier.components.model_training import ModelTrainer
 from cnnClassifier.components.model_evaluation_mlflow import ModelEvaluator
 from cnnClassifier import logger
+from urllib.parse import urlparse
+import os
+
 
 
 STAGE_NAME = "Training"
@@ -45,13 +48,21 @@ class ModelTrainingPipeline:
 			# Evaluate and log
 			logger.info("Testing started.")
 			evaluator = ModelEvaluator(self.model_config)
-			accuracy = evaluator.evaluate_and_log(cvModel, test_df)
+			accuracy = evaluator.evaluate_and_log(cvModel, test_df,mlflow)
 			# Log model to MLflow
 			model_info = mlflow.spark.log_model(cvModel.bestModel, "model")
 			logger.info(f"Best accuracy: {accuracy}")
 			# MLflow Model Registry: Register and transition model
 			model_version = evaluator.model_evaluation_mlflow(run, model_name="Titanic-Model")
 			logger.info(f"Model Registry: Model version {model_version} successfully registered and transitioned.")
+			# Copy best model artifact for DVC tracking
+			experiment_id = run.info.experiment_id
+			best_run_id = run.info.run_id
+			artifact_uri = run.info.artifact_uri
+			logger.info(f"Experiment ID: {experiment_id}, Best Run ID: {best_run_id}")
+			logger.info(f"The path is : {artifact_uri}")
+			best_model_path = f"{artifact_uri}/model"
+			evaluator.copy_best_model(best_model_path, "artifacts/best_model/")
 		self.spark.stop()
 
 
