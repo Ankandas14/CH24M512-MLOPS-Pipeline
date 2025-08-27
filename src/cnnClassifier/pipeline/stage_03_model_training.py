@@ -27,6 +27,7 @@ class ModelTrainingPipeline:
 	def main(self):
 		import time
 		mlflow.set_tracking_uri("file:///mlruns")
+		
 		mlflow.set_experiment("Titanic_Distributed_Training")
 		with mlflow.start_run(run_name="LogisticRegression") as run:
 			# Load data
@@ -52,6 +53,9 @@ class ModelTrainingPipeline:
 			# Log model to MLflow
 			model_info = mlflow.spark.log_model(cvModel.bestModel, "model")
 			logger.info(f"Best accuracy: {accuracy}")
+			logger.info(f"Model saved. Full Model Info: {model_info}")
+			logger.info(f"Model URI (for loading): {model_info.model_uri}")
+			logger.info(f"Full Artifact Path (on disk): {os.path.join(run.info.artifact_uri, model_info.artifact_path)}")
 			# MLflow Model Registry: Register and transition model
 			model_version = evaluator.model_evaluation_mlflow(run, model_name="Titanic-Model")
 			logger.info(f"Model Registry: Model version {model_version} successfully registered and transitioned.")

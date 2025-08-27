@@ -24,7 +24,6 @@ stages:
       - src/cnnClassifier/pipeline/stage_03_model_training.py
       - config/config.yaml
     outs:
-      - confusion_matrix.png
-      - artifacts/best_model/
+      - C:\mlruns\763931740372031351
       
     

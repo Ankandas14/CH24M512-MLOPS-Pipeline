@@ -27,7 +27,9 @@ class ModelEvaluator:
         except Exception:
             pass  # Model may already exist
         model_uri = f"runs:/{run_id}/model"
+        logger.info(f"Registering model from URI: {model_uri}")
         mv = client.create_model_version(model_name, model_uri, run_id)
+        
         logger.info(f"Model version {mv.version} registered in MLflow Model Registry.")
         # Transition model to Staging then Production
         client.transition_model_version_stage(model_name, mv.version, stage="Staging")
